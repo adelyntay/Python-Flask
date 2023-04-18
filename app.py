@@ -3,15 +3,22 @@ from flask_cors import CORS
 import os 
 from flask_pymongo import PyMongo
 from dotenv import load_dotenv
-from markupsafe import escape
-from pymongo import MongoClient
+from werkzeug.security import generate_password_hash, check_password_hash
+
+from flask_jwt_extended import create_access_token
+# from flask_jwt_extended import get_jwt_identity
+# from flask_jwt_extended import jwt_required
+from flask_jwt_extended import JWTManager
+
 
 app = Flask(__name__)
 CORS(app)
 load_dotenv()
 app.config["MONGO_URI"] = os.environ.get("MONGODB_URI")
+app.config['JWT_SECRET_KEY'] = os.getenv("JWT_SECRET_KEY")
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 10800
+jwt = JWTManager(app)
 mongo = PyMongo(app)
-
 users = mongo.db.users
 
 if mongo.cx.server_info():
@@ -23,35 +30,36 @@ else:
 def main():
     return "<p>Hello, World</p>"
 
-@app.route("/holidays") #route "/" -> hello_world()
-def hello_world():
-    return "<p>Hello, Holidays!</p>"
-
-@app.route('/hello')
-def hello():
-    return '{ name: "simon, age: 88}'
-
-@app.route('/user/<username>')
-def show_user_profile(username):
-    # show the user profile for that user
-    return f'User {escape(username)}'
-
-@app.route('/api/users', methods=['POST'])
+# Create user and add to data store
+@app.route("/api/users", methods=["POST"])
 def create_user():
     data = request.get_json()
-    name = data.get('name')
-    email = data.get('email')
+    name = data.get("name")
+    email = data.get("email")
+    password = data.get("password")
 
-    # Validate input
-    if not name or not email:
-        return jsonify({'error': 'Name and email are required'}), 400
-
-    # Create user and add to data store
-    user = {'name': name, 'email': email}
+    user = {"name": name, "email": email, "password":generate_password_hash(password)}
     result = users.insert_one(user)
     new_user_id = str(result.inserted_id)
 
-    return jsonify({'id': new_user_id}), 201
+    return jsonify({"id": new_user_id}), 201
+
+# Login - check if password and email are correct
+@app.route("/api/users/login", methods=["POST"])
+def login():
+    data = request.get_json()
+    email = data.get("email")
+    password = data.get("password")
+
+    user = users.find_one({"email": email})
+    if not user:
+        return jsonify({"error": "Invalid email or password"})
+
+    if not check_password_hash(user["password"], password):
+        return jsonify({"error": "Invalid email or password"})
+    
+    access_token = create_access_token(identity=email)
+    return jsonify(access_token=access_token)
 
 if __name__ == "__main__":
     app.run()
