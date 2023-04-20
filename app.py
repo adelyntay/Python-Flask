@@ -65,28 +65,32 @@ def login():
     if not check_password_hash(user["password"], password):
         return jsonify({"error": "Invalid password"}), 401
      
-    return jsonify({"success": "Logged in successfully!"})
+    # return jsonify({"success": "Logged in successfully!"})
     
-    # access_token = create_access_token(identity=email)
-    # return jsonify(access_token=access_token)
+    access_token = create_access_token(identity=email)
+    return jsonify(access_token=access_token)
 
 @app.route("/api/posts/create", methods=["POST"])
-# @jwt_required()
+@jwt_required()
 def create_post():
         data = request.get_json()
         title = data.get("title")
         body = data.get("body")
+        type = data.get("type")
+        quality = data.get("quality")
         date = data.get("date")
         is_public = data.get("isPublic")
 
-        # current_user_email = get_jwt_identity()
-        # current_user = users.find_one({"email": current_user_email})
+        current_user_email = get_jwt_identity()
+        current_user = users.find_one({"email": current_user_email})
 
         post = {
             "title": title, 
             "body": body, 
+            "type": type,
+            "quality": quality,
             "date": date, 
-            # "user_id": current_user["_id"],
+            "user_id": current_user["_id"],
             "is_public": is_public
             }
         
