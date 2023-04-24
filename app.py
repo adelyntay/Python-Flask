@@ -145,6 +145,29 @@ def show_post(id):
         return jsonify (post)
     else:
         return jsonify({"message": "Post not found"})
+    
+# Update post
+@app.route("/api/posts/<id>", methods=["PUT"])
+@jwt_required()
+def edit_post(id):
+
+    json = request.json
+    post = dreams.find_one({"_id": ObjectId(id)})
+    if post:
+        post["title"] = json.get("title", post["title"])
+        post["body"] = json.get("body", post["body"])
+        post["type"] = json.get("type", post["type"])
+        post["quality"] = json.get("quality", post["quality"])
+        post["date"] = json.get("date", post["date"])
+        post["is_public"] = json.get("is_public", post["is_public"])
+
+        # MongoDB update operator
+        dreams.update_one({"_id": ObjectId(id)}, {"$set": post})
+        post["_id"] = str(post["_id"])
+        post.pop("user", None)
+        return jsonify(post)
+    else:
+        return jsonify({"message": "Post not found"})
 
 # Delete post
 @app.route("/api/posts/<id>", methods=["DELETE"])
