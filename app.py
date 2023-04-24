@@ -2,15 +2,12 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os 
 from flask_pymongo import PyMongo
-from bson.objectid import ObjectId
+from bson import ObjectId
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from flask_jwt_extended import create_access_token
-from flask_jwt_extended import get_jwt_identity
-from flask_jwt_extended import jwt_required
 from flask_jwt_extended import JWTManager
-
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 
 app = Flask(__name__)
 CORS(app)
@@ -19,20 +16,20 @@ app.config["MONGO_URI"] = os.environ.get("MONGODB_URI")
 app.config['JWT_SECRET_KEY'] = os.getenv("JWT_SECRET_KEY")
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 10800
 jwt = JWTManager(app)
+
+# MongoDB Database
+# PyMongo - MongoDB driver for synchronous Python app
 mongo = PyMongo(app)
 users = mongo.db.users
-post = mongo.db.posts
+dreams = mongo.db.dreams
 
+# Check connection
 if mongo.cx.server_info():
     print("Successfully connected to MongoDB!")
 else:
     print("Failed to connect to MongoDB.")
 
-@app.route("/")
-def main():
-    return "<p>Hello, World</p>"
-
-# Create user and add to data store
+# Create user 
 @app.route("/api/users", methods=["POST"])
 def create_user():
     data = request.get_json()
@@ -40,6 +37,7 @@ def create_user():
     email = data.get("email")
     password = data.get("password")
 
+    #PyMongo use dictionaries to represent documents
     user = {
         "username": username, 
         "email": email, 
@@ -51,7 +49,7 @@ def create_user():
 
     return jsonify({"id": new_user_id}), 201
 
-# Login - check if password and email are correct
+# Login 
 @app.route("/api/users/login", methods=["POST"])
 def login():
     data = request.get_json()
@@ -64,12 +62,11 @@ def login():
 
     if not check_password_hash(user["password"], password):
         return jsonify({"error": "Invalid password"}), 401
-     
-    # return jsonify({"success": "Logged in successfully!"})
     
     access_token = create_access_token(identity=email)
-    return jsonify(access_token=access_token)
+    return jsonify(access_token=access_token)   
 
+# Create Post
 @app.route("/api/posts/create", methods=["POST"])
 @jwt_required()
 def create_post():
@@ -81,6 +78,7 @@ def create_post():
         date = data.get("date")
         is_public = data.get("isPublic")
 
+        # Identify the user that created the post 
         current_user_email = get_jwt_identity()
         current_user = users.find_one({"email": current_user_email})
 
@@ -90,26 +88,46 @@ def create_post():
             "type": type,
             "quality": quality,
             "date": date, 
-            "user_id": current_user["_id"],
+            # Add created user ID and email to Dream collection
+            "user": {"_id": current_user["_id"], "email": current_user["email"]},
             "is_public": is_public
             }
         
-        result = mongo.db.posts.insert_one(post)
+        result = dreams.insert_one(post)
 
         if result.inserted_id:
-         return jsonify({"id": str(result.inserted_id)})
+         response = ({"id": str(result.inserted_id)})
+         return jsonify(response)
 
         return jsonify({"error": "Failed to create post."})
 
+# Show public post
 @app.route("/api/posts/public", methods=["GET"])
 def get_public_posts():
-    public_posts = mongo.db.posts.find({"is_public": True})
+
+    # Exclude user field from the result 
+    public_posts = dreams.find({"is_public": True}, {"user": 0})
     posts = []
     for post in public_posts:
         post["_id"] = str(post["_id"])
         posts.append(post)
     return jsonify(posts)
 
+# View all posts
+@app.route("/api/posts", methods=["GET"])
+@jwt_required()
+def get_user_posts():
+  
+    current_user_email = get_jwt_identity()
+    user_dreams = dreams.find({"user.email": current_user_email})
+
+    # Loop through Dream and append them to the list
+    all_dreams = []
+    for dream in user_dreams:
+        dream["_id"] = str(dream["_id"])
+        dream["user"]["_id"] = str(dream["user"]["_id"])
+        all_dreams.append(dream)
+    return jsonify(all_dreams)
 
 
 if __name__ == "__main__":
