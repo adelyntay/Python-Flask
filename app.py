@@ -134,9 +134,10 @@ def get_user_posts():
 @app.route("/api/posts/<id>", methods=["GET"])
 @jwt_required()
 def show_post(id):
-    print(f"ID value: {id}")
+
+    # print(f"ID value: {id}")
     post = dreams.find_one({"_id": ObjectId(id)})
-    print(f"Post value: {post}")
+    # print(f"Post value: {post}")
     if post:
         post["_id"] = str(post["_id"])
         # remove user object
@@ -144,6 +145,16 @@ def show_post(id):
         return jsonify (post)
     else:
         return jsonify({"message": "Post not found"})
+
+# Delete post
+@app.route("/api/posts/<id>", methods=["DELETE"])
+def delete_post(id):
+
+    result = dreams.delete_one({"_id": ObjectId(id)})
+    if result.deleted_count == 1:
+        return jsonify({"success": "Post deleted successfully."})
+    else:
+        return jsonify({"error": "Failed to delete post."})
 
 if __name__ == "__main__":
     app.run()
