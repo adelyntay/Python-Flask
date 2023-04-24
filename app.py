@@ -3,6 +3,7 @@ from flask_cors import CORS
 import os 
 from flask_pymongo import PyMongo
 from bson import ObjectId
+import bson
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -129,6 +130,20 @@ def get_user_posts():
         all_dreams.append(dream)
     return jsonify(all_dreams)
 
+# Read a specific post
+@app.route("/api/posts/<id>", methods=["GET"])
+@jwt_required()
+def show_post(id):
+    print(f"ID value: {id}")
+    post = dreams.find_one({"_id": ObjectId(id)})
+    print(f"Post value: {post}")
+    if post:
+        post["_id"] = str(post["_id"])
+        # remove user object
+        post.pop("user", None)
+        return jsonify (post)
+    else:
+        return jsonify({"message": "Post not found"})
 
 if __name__ == "__main__":
     app.run()
