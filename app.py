@@ -55,11 +55,13 @@ def create_user():
 def login():
     data = request.get_json()
     email = data.get("email")
+    # username = data.get("username")
     password = data.get("password")
 
     user = users.find_one({"email": email})
+    # user = users.find_one({"username": username})
     if not user:
-        return jsonify({"error": "Invalid email"}), 401
+        return jsonify({"error": "Invalid username"}), 401
 
     if not check_password_hash(user["password"], password):
         return jsonify({"error": "Invalid password"}), 401
@@ -106,8 +108,9 @@ def create_post():
 @app.route("/api/posts/public", methods=["GET"])
 def get_public_posts():
 
-    # Exclude user field from the result 
-    public_posts = dreams.find({"is_public": True}, {"user": 0})
+    # Exclude user and comments field from the result 
+    public_posts = dreams.find({"is_public": True}, {"user": 0, "comments": 0}) \
+                        .sort("date", -1)
     posts = []
     for post in public_posts:
         post["_id"] = str(post["_id"])
@@ -120,7 +123,7 @@ def get_public_posts():
 def get_user_posts():
   
     current_user_email = get_jwt_identity()
-    user_dreams = dreams.find({"user.email": current_user_email})
+    user_dreams = dreams.find({"user.email": current_user_email}, {"comments": 0}).sort("date", -1)
 
     # Loop through Dream and append them to the list
     all_dreams = []
@@ -136,12 +139,13 @@ def get_user_posts():
 def show_post(id):
 
     # print(f"ID value: {id}")
-    post = dreams.find_one({"_id": ObjectId(id)})
+    # Projection - exclude user and comments
+    post = dreams.find_one({"_id": ObjectId(id)}, {"user": 0, "comments": 0})
     # print(f"Post value: {post}")
     if post:
         post["_id"] = str(post["_id"])
         # remove user object
-        post.pop("user", None)
+        # post.pop("user", None)
         return jsonify (post)
     else:
         return jsonify({"message": "Post not found"})
@@ -178,6 +182,46 @@ def delete_post(id):
         return jsonify({"success": "Post deleted successfully."})
     else:
         return jsonify({"error": "Failed to delete post."})
+    
+# Add comment
+@app.route("/api/posts/<id>/comments", methods=["POST"])
+@jwt_required()
+def create_comment(id):
+        data = request.get_json()
+        comment = data.get("comment")
+
+        current_user_email = get_jwt_identity()
+        current_user = users.find_one({"email": current_user_email})
+
+        # Find the dream by its ID and update its comments field
+        result = dreams.update_one(
+        {"_id": ObjectId(id)},
+        {"$push": {"comments": {"comment": comment, "user": current_user["email"]}}}
+    )
+
+        if result.modified_count:
+            response = {"id": str(id)}
+            return jsonify(response)
+
+        return jsonify({"error": "Failed to create comment."})
+
+# View all comments 
+@app.route("/api/posts/<id>/comments", methods=["GET"])
+def view_comments(id):
+    post = dreams.find_one({"_id": ObjectId(id)})
+    if post:
+        comments = post.get("comments", [])
+        return jsonify(comments)
+    return jsonify({"error": "Post not found."})
+
+@app.route("/api/dreams", methods=["GET"])
+@jwt_required()
+def get_dreams_data():
+    
+    current_user_email = get_jwt_identity()
+    user_dreams = list(dreams.find({"user.email": current_user_email}))
+    total_dreams = len(list(user_dreams))
+    return jsonify({"totalDreams": total_dreams})
 
 if __name__ == "__main__":
     app.run()
