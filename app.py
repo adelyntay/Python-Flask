@@ -3,7 +3,8 @@ from flask_cors import CORS
 import os 
 from flask_pymongo import PyMongo
 from bson import ObjectId
-import bson
+import dateutil.parser
+from dateutil import parser
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -222,6 +223,77 @@ def get_dreams_data():
     user_dreams = list(dreams.find({"user.email": current_user_email}))
     total_dreams = len(list(user_dreams))
     return jsonify({"totalDreams": total_dreams})
+
+if __name__ == "__main__":
+    app.run()
+
+@app.route("/api/data", methods=["GET"])
+@jwt_required()
+def get_type_data():
+    
+    current_user_email = get_jwt_identity()
+    user_dreams = dreams.find({"user.email": current_user_email})
+
+    # Initialize variables
+    num_good_sleep = 0
+    num_avg_sleep = 0
+    num_poor_sleep = 0
+    num_normal_dream = 0
+    num_lucid_dream = 0
+    num_recurring_dream = 0
+    num_nightmare_dream = 0
+
+    selected_month = request.args.get('month')
+
+    # Date-Picker store date as string
+    # Convert date string to datetime object
+    for dream in user_dreams:
+        date_str = dream["date"]
+        date_obj = dateutil.parser.isoparse(date_str)
+        print(date_str)
+        month = date_obj.month
+
+        if str(month) == selected_month:
+        # Determine sleeping quality
+            if dream["quality"] == "Good":
+             num_good_sleep += 1
+            elif dream["quality"] == "Average":
+              num_avg_sleep += 1
+            elif dream["quality"] == "Poor":
+              num_poor_sleep += 1
+
+        # Determine dream type
+            if "Normal" in dream["type"]:
+             num_normal_dream += 1
+            elif "Lucid" in dream["type"]:
+             num_lucid_dream += 1
+            elif "Recurring" in dream["type"]:
+             num_recurring_dream += 1
+            elif "Nightmare" in dream["type"]:
+             num_nightmare_dream += 1
+    
+    # Create dictionaries to store the calculated data
+    sleep_data = {
+        "Good": num_good_sleep,
+        "Average": num_avg_sleep,
+        "Poor": num_poor_sleep
+    }
+    
+
+    dream_data = {
+        "Normal": num_normal_dream,
+        "Lucid": num_lucid_dream,
+        "Recurring": num_recurring_dream,
+        "Nightmare": num_nightmare_dream
+    }
+    
+    # Return the data as JSON
+    return jsonify({
+        "month": month,
+        "sleep": sleep_data,
+        "dream": dream_data
+    })
+
 
 if __name__ == "__main__":
     app.run()
