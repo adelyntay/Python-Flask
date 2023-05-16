@@ -12,8 +12,11 @@ from flask_jwt_extended import JWTManager
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 
 app = Flask(__name__)
-CORS(app)
 load_dotenv()
+
+frontend_url = os.environ.get("FLASK_APP_FRONTEND_URL")
+CORS(app, origins=frontend_url)
+
 app.config["MONGO_URI"] = os.environ.get("MONGODB_URI")
 app.config['JWT_SECRET_KEY'] = os.getenv("JWT_SECRET_KEY")
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 10800
@@ -32,7 +35,7 @@ else:
     print("Failed to connect to MongoDB.")
 
 # Create user 
-@app.route("/api/users", methods=["POST"])
+@app.route("/users", methods=["POST"])
 def create_user():
     data = request.get_json()
     username = data.get("username")
@@ -52,7 +55,7 @@ def create_user():
     return jsonify({"id": new_user_id}), 201
 
 # Login 
-@app.route("/api/users/login", methods=["POST"])
+@app.route("/users/login", methods=["POST"])
 def login():
     data = request.get_json()
     email = data.get("email")
@@ -71,7 +74,7 @@ def login():
     return jsonify(access_token=access_token)   
 
 # Create Post
-@app.route("/api/posts/create", methods=["POST"])
+@app.route("/posts/create", methods=["POST"])
 @jwt_required()
 def create_post():
         data = request.get_json()
@@ -106,7 +109,7 @@ def create_post():
         return jsonify({"error": "Failed to create post."})
 
 # Show public post
-@app.route("/api/posts/public", methods=["GET"])
+@app.route("/posts/public", methods=["GET"])
 def get_public_posts():
 
     # Exclude user and comments field from the result 
@@ -119,7 +122,7 @@ def get_public_posts():
     return jsonify(posts)
 
 # View all posts
-@app.route("/api/posts", methods=["GET"])
+@app.route("/posts", methods=["GET"])
 @jwt_required()
 def get_user_posts():
   
@@ -135,7 +138,7 @@ def get_user_posts():
     return jsonify(all_dreams)
 
 # Read a specific post
-@app.route("/api/posts/<id>", methods=["GET"])
+@app.route("/posts/<id>", methods=["GET"])
 @jwt_required()
 def show_post(id):
 
@@ -152,7 +155,7 @@ def show_post(id):
         return jsonify({"message": "Post not found"})
     
 # Update post
-@app.route("/api/posts/<id>", methods=["PUT"])
+@app.route("/posts/<id>", methods=["PUT"])
 @jwt_required()
 def edit_post(id):
 
@@ -175,7 +178,7 @@ def edit_post(id):
         return jsonify({"message": "Post not found"})
 
 # Delete post
-@app.route("/api/posts/<id>", methods=["DELETE"])
+@app.route("/posts/<id>", methods=["DELETE"])
 def delete_post(id):
 
     result = dreams.delete_one({"_id": ObjectId(id)})
@@ -185,7 +188,7 @@ def delete_post(id):
         return jsonify({"error": "Failed to delete post."})
     
 # Add comment
-@app.route("/api/posts/<id>/comments", methods=["POST"])
+@app.route("/posts/<id>/comments", methods=["POST"])
 @jwt_required()
 def create_comment(id):
         data = request.get_json()
@@ -207,7 +210,7 @@ def create_comment(id):
         return jsonify({"error": "Failed to create comment."})
 
 # View all comments 
-@app.route("/api/posts/<id>/comments", methods=["GET"])
+@app.route("/posts/<id>/comments", methods=["GET"])
 def view_comments(id):
     post = dreams.find_one({"_id": ObjectId(id)})
     if post:
@@ -215,7 +218,7 @@ def view_comments(id):
         return jsonify(comments)
     return jsonify({"error": "Post not found."})
 
-@app.route("/api/dreams", methods=["GET"])
+@app.route("/dreams", methods=["GET"])
 @jwt_required()
 def get_dreams_data():
     
@@ -227,7 +230,7 @@ def get_dreams_data():
 if __name__ == "__main__":
     app.run()
 
-@app.route("/api/data", methods=["GET"])
+@app.route("/data", methods=["GET"])
 @jwt_required()
 def get_type_data():
     
